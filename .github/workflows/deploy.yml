@@ -29,8 +29,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: 'npm'
-          cache-dependency-path: './app/package-lock.json'
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -40,32 +38,38 @@ jobs:
           repository_name="${GITHUB_REPOSITORY#*/}"
           echo "PAGES_BASE_PATH=/${repository_name}/" >> "$GITHUB_ENV"
 
-      - name: Install dependencies and fix TS config
+      - name: Install dependencies
         working-directory: ./app
         run: |
-          echo "🧹 Очищаю кэш npm для предотвращения зависаний..."
-          npm cache clean --force
+          echo "🧹 Полная очистка для исключения кэш-багов npm..."
+          rm -rf node_modules package-lock.json
           
-          echo "📦 Устанавливаю зависимости (с флагом обхода конфликтов)..."
-          npm install --no-audit --no-fund --legacy-peer-deps
+          echo "📦 Чистая установка зависимостей..."
+          npm install --legacy-peer-deps
           
-          echo "🛠️ Гарантированная установка TypeScript и типов..."
+          echo "🛠️ Принудительная установка TypeScript и типов..."
           npm install typescript @types/node vite --save-dev --legacy-peer-deps
           
-          echo "🔧 Патчу tsconfig.json для совместимости..."
-          # Удаляем проблемный baseUrl
+          echo "🔧 Патчу tsconfig.json..."
           sed -i '/"baseUrl":/d' tsconfig.json
-          # Добавляем moduleResolution: bundler, если его нет
           if ! grep -q '"moduleResolution"' tsconfig.json; then
             sed -i 's/"target":/"moduleResolution": "bundler",\n    "target":/' tsconfig.json
           fi
           
-          echo "✅ Проверка версии TS (прямой вызов из node_modules, без npx):"
-          ./node_modules/.bin/tsc --version || echo "⚠️ Предупреждение: tsc не найден, но переходим к сборке"
+          echo "✅ Жёсткая проверка установки tsc..."
+          if [ ! -f "./node_modules/.bin/tsc" ]; then
+            echo "❌ КРИТИЧЕСКАЯ ОШИБКА: tsc НЕ установлен в node_modules/.bin!"
+            ls -la ./node_modules/.bin/ || true
+            exit 1
+          fi
+          ./node_modules/.bin/tsc --version
 
       - name: Build game
         working-directory: ./app
-        run: npm run build
+        run: |
+          echo "🚀 Запускаю сборку через ПРЯМОЙ вызов бинарников (в обход npm run)..."
+          ./node_modules/.bin/tsc -p tsconfig.json --noEmit
+          ./node_modules/.bin/vite build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
