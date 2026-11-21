@@ -40,7 +40,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app
-        run: npm ci --no-audit --no-fund
+        run: |
+          npm install --no-audit --no-fund
+          # ГАРАНТИРОВАННАЯ установка компилятора, если его нет в package.json
+          npm install typescript vite --save-dev
 
       - name: Build game
         working-directory: ./app
