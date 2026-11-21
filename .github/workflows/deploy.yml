@@ -43,24 +43,25 @@ jobs:
       - name: Install dependencies and fix TS config
         working-directory: ./app
         run: |
-          echo "📦 Устанавливаю зависимости из package.json..."
-          npm install --no-audit --no-fund
+          echo "🧹 Очищаю кэш npm для предотвращения зависаний..."
+          npm cache clean --force
           
-          echo "🛠️ Локально добавляю TypeScript и типы (избегаем конфликтов версий)..."
-          npm install typescript @types/node vite --save-dev
+          echo "📦 Устанавливаю зависимости (с флагом обхода конфликтов)..."
+          npm install --no-audit --no-fund --legacy-peer-deps
           
-          echo "🔧 Патчу tsconfig.json для совместимости с новыми версиями TS..."
-          # 1. Удаляем проблемную строку с baseUrl
+          echo "🛠️ Гарантированная установка TypeScript и типов..."
+          npm install typescript @types/node vite --save-dev --legacy-peer-deps
+          
+          echo "🔧 Патчу tsconfig.json для совместимости..."
+          # Удаляем проблемный baseUrl
           sed -i '/"baseUrl":/d' tsconfig.json
-          # 2. Добавляем moduleResolution: bundler (стандарт для Vite), если его нет
+          # Добавляем moduleResolution: bundler, если его нет
           if ! grep -q '"moduleResolution"' tsconfig.json; then
             sed -i 's/"target":/"moduleResolution": "bundler",\n    "target":/' tsconfig.json
           fi
           
-          echo "✅ Проверка версии TS и патча:"
-          npx tsc --version
-          echo "--- Содержимое compilerOptions ---"
-          grep -A 15 '"compilerOptions"' tsconfig.json || true
+          echo "✅ Проверка версии TS (прямой вызов из node_modules, без npx):"
+          ./node_modules/.bin/tsc --version || echo "⚠️ Предупреждение: tsc не найден, но переходим к сборке"
 
       - name: Build game
         working-directory: ./app
